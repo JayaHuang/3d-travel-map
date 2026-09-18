@@ -142,13 +142,31 @@ node ../scripts/smoke_test.js "我的3D地图.html" ./shots
 ├── scripts/
 │   ├── fetch_admin_geo.py       # adcode → 简化边界 geo.js
 │   ├── build_standalone.py      # 内联为单文件 HTML
-│   └── smoke_test.js            # 无头浏览器冒烟测试
+│   ├── smoke_test.js            # 无头浏览器冒烟测试
+│   └── make_media.js            # 生成演示截图与分镜序列帧
 ├── references/
 │   ├── threejs-map-recipes.md   # 技术配方 + 13 条踩坑记录
 │   └── content-guide.md         # 内容调研与写作规范
 ├── docs/                        # 演示素材（GIF / MP4 / 截图）
 └── examples/shanxi/             # 山西省完整示例（成品 + 数据源）
 ```
+
+## 生成演示素材（GIF / MP4 / 截图）
+
+无头浏览器软渲染只有 ~3 FPS，直接录屏会卡成幻灯片。正确做法是**逐帧摆机位**：每帧显式设置相机位姿再截图，最后用 ffmpeg 按 10~12fps 编码，得到流畅演示。
+
+```bash
+# 1) 截取 4 张关键帧 + 62 张分镜序列帧
+node scripts/make_media.js "我的3D地图.html" ./media
+
+# 2) 序列帧 → GIF（两遍调色板，体积可控）
+ffmpeg -framerate 10 -i media/frames/f%02d.png   -vf "scale=760:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4"   -loop 0 demo.gif
+
+# 3) 序列帧 → MP4
+ffmpeg -framerate 12 -i media/seq/s%03d.png -vf "scale=1280:-2"   -c:v libx264 -crf 22 -pix_fmt yuv420p -movflags +faststart demo.mp4
+```
+
+> ffmpeg 建议用 `pip install imageio-ffmpeg` 自带的完整版；Playwright 自带的 ffmpeg 是裁剪版（无 libx264 / palettegen）。
 
 ## 已知限制
 
