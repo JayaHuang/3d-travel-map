@@ -7,7 +7,7 @@
  */
 const path = require('path');
 const fs = require('fs');
-const { chromium } = require('playwright-core');
+const { findPlaywright, findChromium, GPU_ARGS } = require('./_browser.js');
 
 const HTML = process.argv[2];
 const OUT = process.argv[3] || path.resolve(__dirname, 'media');
@@ -17,11 +17,11 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 (async () => {
   fs.mkdirSync(path.join(OUT, 'frames'), { recursive: true });
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: 'G:/AppData-Local/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-win64/chrome-headless-shell.exe',
-    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']
-  });
+  const { chromium } = findPlaywright();
+  const exe = findChromium();
+  if (!exe) throw new Error('未找到 chromium，可设置 PLAYWRIGHT_BROWSERS_PATH 指向浏览器目录');
+  console.log('chromium:', exe);
+  const browser = await chromium.launch({ headless: true, executablePath: exe, args: GPU_ARGS });
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   page.on('pageerror', e => console.log('[pageerror]', e.message));
 

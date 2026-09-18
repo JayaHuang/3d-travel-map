@@ -86,35 +86,23 @@ def rings_of(geom):
     return out
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument('adcode', help='行政区代码，如 140000 山西 / 330100 杭州')
-    ap.add_argument('--out', default=None, help='输出路径，默认 ./data/geo.js')
-    ap.add_argument('--prov-tol', type=float, default=0.012, help='主体轮廓抽稀容差(度)')
-    ap.add_argument('--dist-tol', type=float, default=0.008, help='下级行政区抽稀容差(度)')
-    ap.add_argument('--min-area', type=float, default=0.0009, help='丢弃过小的碎块(平方度)')
-    args = ap.parse_args()
-
-    out_path = args.out or os.path.join('data', 'geo.js')
-    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
-
-    outline = get_json(API.format(args.adcode))
-    print('outline features:', len(outline['features']))
+def build_geo(adcode, prov_tol=0.012, dist_tol=0.008, min_area=0.0009, verbose=True):
+    """抓取 adcode 的行政区边界并简化，返回 {'province': ring, 'cities': [{n,c,r}]}"""
+    outline = get_json(API.format(adcode))
     try:
-        sub = get_json(API.format(args.adcode + '_full'))
-    except Exception as e:
-        print('no subdivisions:', e)
+        sub = get_json(API.format(adcode + '_full'))
+    except Exception:
         sub = {'features': []}
 
-    # 主体轮廓：取面积最大的环
     best = None
     for f in outline['features']:
         for ring in rings_of(f['geometry']):
             r = [[round(x, 4), round(y, 4)] for x, y in ring]
             if best is None or ring_area(r) > ring_area(best):
                 best = r
-    province = simplify_ring(best, args.prov_tol)
-    print('outline pts %d -> %d' % (len(best), len(province)))
+    province = simplify_ring(best, prov_tol)
+    if verbose:
+        print('outline pts %d -> %d' % (len(best), len(province)))
 
     cities = []
     feats = sub['features'] if len(sub['features']) > 1 else []
@@ -123,9 +111,9 @@ def main():
         rings = []
         for ring in rings_of(f['geometry']):
             r = [[round(x, 4), round(y, 4)] for x, y in ring]
-            if ring_area(r) < args.min_area:
+            if ring_area(r) < min_area:
                 continue
-            r = simplify_ring(r, args.dist_tol)
+            r = simplify_ring(r, dist_tol)
             if len(r) < 4:
                 continue
             rings.append(r)
@@ -138,14 +126,30 @@ def main():
             'c': [round(c[0], 4), round(c[1], 4)],
             'r': rings[:3],
         })
-        print('  %-8s rings=%d pts=%d' % (cities[-1]['n'], len(rings[:3]), sum(len(x) for x in rings[:3])))
+        if verbose:
+            print('  %-8s rings=%d pts=%d' % (cities[-1]['n'], len(cities[-1]['r']),
+                                              sum(len(x) for x in cities[-1]['r'])))
+    return {'province': province, 'cities': cities}
 
-    data = {'province': province, 'cities': cities}
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('adcode', help='行政区代码，如 140000 山西 / 330100 杭州')
+    ap.add_argument('--out', default=None, help='输出路径，默认 ./data/geo.js')
+    ap.add_argument('--prov-tol', type=float, default=0.012, help='主体轮廓抽稀容差(度)')
+    ap.add_argument('--dist-tol', type=float, default=0.008, help='下级行政区抽稀容差(度)')
+    ap.add_argument('--min-area', type=float, default=0.0009, help='丢弃过小的碎块(平方度)')
+    args = ap.parse_args()
+
+    out_path = args.out or os.path.join('data', 'geo.js')
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+
+    data = build_geo(args.adcode, args.prov_tol, args.dist_tol, args.min_area)
     with open(out_path, 'w', encoding='utf-8') as fp:
         fp.write('window.RG_GEO=')
         json.dump(data, fp, ensure_ascii=False, separators=(',', ':'))
         fp.write(';')
-    print('written %s (%.1f KB), %d subdivisions' % (out_path, os.path.getsize(out_path) / 1024.0, len(cities)))
+    print('written %s (%.1f KB), %d subdivisions' % (out_path, os.path.getsize(out_path) / 1024.0, len(data['cities'])))
 
 
 if __name__ == '__main__':

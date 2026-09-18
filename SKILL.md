@@ -27,7 +27,7 @@ agent_created: true
 | `scripts/fetch_admin_geo.py` | 按 adcode 抓取并简化行政区边界 → `geo.js` |
 | `scripts/build_standalone.py` | 把 src/ 内联成单 HTML |
 | `scripts/smoke_test.js` | 无头浏览器冒烟测试（截图/报错/帧率） |
-| `references/threejs-map-recipes.md` | **改代码前必读**：技术配方、参数经验值、13 条实机踩坑记录 |
+| `references/implementation.md` | 二次开发参考：渲染管线各环节的实现要点与推荐参数（配色、光照、地形、标签、性能预算） |
 | `references/content-guide.md` | 内容调研流程、写作口径、效率清单 |
 
 ## 工作流程
@@ -71,11 +71,11 @@ NODE_PATH=<node workspace>/node_modules node $SKILL/scripts/smoke_test.js "<产�
 用 present_files 交付最终 HTML，并简要说明玩法（拖拽旋转/点击景点/筛选/线路/昼夜）。
 清理调试脚本与截图（保留 src/、build.py 便于后续迭代）。
 
-## 常见问题速查（详见 references/threejs-map-recipes.md）
+## 常见问题速查（详见 references/implementation.md）
 
 | 症状 | 原因 → 解法 |
 |---|---|
-| 山体一片死白/蜡状 | 光照过曝 → 用 recipes 第 5 节的灯光数值 + ACESFilmic |
+| 山体一片死白/蜡状 | 光照过曝 → 按 implementation.md 第 5 节的灯光数值 + ACESFilmic |
 | 山是尖锐金字塔 | 山脊半径太小（<0.14°）→ 放宽到 0.15~0.19 并拉开中心点间距 |
 | 地形边界锯齿/漏光 | 只设了 transparent 没设 alphaTest → 用 `alphaTest:0.5` 且不设 transparent |
 | 侧壁出现大片死黑 | 侧壁用了受光材质 → 改 `MeshBasicMaterial` + 顶点色渐变 |
@@ -91,4 +91,4 @@ NODE_PATH=<node workspace>/node_modules node $SKILL/scripts/smoke_test.js "<产�
 - **改内容**：只动 `src/data/spots.js` 和 `src/data/region.js`，改完重跑 Step 4。
 - **加模型类型**：在 app_template.js 的 `BUILDERS` 里加一个返回 THREE.Group 的函数，spots 的 `icon` 字段即可引用。
 - **换主题色**：region.js 的 `RG_CITIES`（下级行政区配色）与 `STOPS`（高程渐变）。
-- **接真实高程**：当前是手工山脉示意；如需 DEM，替换 `rawH()` 的数据源（见 recipes 第 13 节）。
+- **接真实高程**：当前是手工山脉示意；如需 DEM，替换 `rawH()` 的数据源（见 implementation.md 第 13 节）。

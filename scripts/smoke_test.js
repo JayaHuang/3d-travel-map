@@ -5,46 +5,19 @@
  *   NODE_PATH=<node workspace>/node_modules node smoke_test.js <html文件> [输出目录]
  *   node smoke_test.js D:/proj/山西地图.html ./shots
  *
- * 环境要点（本机实测）:
- *   - playwright-core 装在 C:/Users/Administrator/.workbuddy/binaries/node/workspace/node_modules
- *   - 浏览器在 G:/AppData-Local/ms-playwright（junction 到 C:/Users/Administrator/AppData/Local/ms-playwright）
- *   - playwright-core 的版本号往往 > 已装浏览器版本，必须显式指定 executablePath
+ * 环境要点:
+ *   - 需要 playwright-core 与 chromium；路径由 scripts/_browser.js 自动探测，
+ *     也可用 PLAYWRIGHT_NODE_PATH / PLAYWRIGHT_BROWSERS_PATH 指定
+ *   - playwright-core 版本号常大于已装浏览器版本，因此必须显式指定 executablePath
  *   - 软渲染(swiftshader) 只有 ~3 FPS：相机飞行动画要等 10s+ 才到位，别误判成 bug
  */
 const path = require('path');
 const fs = require('fs');
+const { findPlaywright, findChromium, GPU_ARGS } = require('./_browser.js');
 
 const HTML = process.argv[2];
 const OUTDIR = process.argv[3] || path.dirname(HTML);
 if (!HTML) { console.error('usage: node smoke_test.js <html> [outdir]'); process.exit(1); }
-
-function findPlaywright() {
-  const cands = [
-    'C:/Users/Administrator/.workbuddy/binaries/node/workspace/node_modules/playwright-core',
-    'playwright-core', 'playwright'
-  ];
-  for (const c of cands) { try { return require(c); } catch (e) { /* next */ } }
-  throw new Error('playwright-core not found. 用 NODE_PATH 指向 node workspace');
-}
-
-function findChromium() {
-  const roots = ['G:/AppData-Local/ms-playwright', 'C:/Users/Administrator/AppData/Local/ms-playwright',
-                 'G:/AppData-Local/ms-playwright', 'C:/Users/Administrator/.cache/ms-playwright'];
-  let best = null;
-  for (const root of roots) {
-    if (!fs.existsSync(root)) continue;
-    for (const d of fs.readdirSync(root)) {
-      const m = d.match(/^chromium(?:_headless_shell)?-(\d+)$/);
-      if (!m) continue;
-      const ver = parseInt(m[1], 10);
-      const shell = path.join(root, d, 'chrome-headless-shell-win64', 'chrome-headless-shell.exe');
-      const full = path.join(root, d, 'chrome-win', 'chrome.exe');
-      const exe = fs.existsSync(shell) ? shell : (fs.existsSync(full) ? full : null);
-      if (exe && (!best || ver > best.ver)) best = { exe, ver };
-    }
-  }
-  return best && best.exe;
-}
 
 (async () => {
   const { chromium } = findPlaywright();
@@ -54,7 +27,7 @@ function findChromium() {
 
   const browser = await chromium.launch({
     headless: true, executablePath: exe,
-    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']
+    args: GPU_ARGS
   });
   const page = await browser.newPage({ viewport: { width: 1600, height: 950 } });
   const errs = [];

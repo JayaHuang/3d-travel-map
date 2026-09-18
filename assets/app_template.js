@@ -3,7 +3,7 @@
 'use strict';
 
 var CFG = window.RG_CONFIG;
-var GEO = window.RG_GEO, SPOTS = window.RG_SPOTS, CITY_COLOR = window.RG_CITIES;
+var GEO = window.RG_GEO, SPOTS = window.RG_SPOTS, CITY_COLOR = window.RG_CITIES || {};
 var RANGES = window.RG_RANGES || [], BASINS = window.RG_BASINS || [], RIVERS = window.RG_RIVERS || {};
 var PROV = GEO.province;
 
@@ -264,12 +264,16 @@ function buildRiver(pts, width, color, opacity, yOff) {
   scene.add(mesh);
   return mesh;
 }
-buildRiver(RIVERS['黄河'], 0.62, 0xd9a441, 0.92, 0.10);
-buildRiver(RIVERS['汾河'], 0.34, 0x4fb8e8, 0.85, 0.09);
-buildRiver(RIVERS['桑干河'], 0.20, 0x58c8dd, 0.62, 0.08);
-buildRiver(RIVERS['漳河'], 0.20, 0x58c8dd, 0.62, 0.08);
-buildRiver(RIVERS['沁河'], 0.20, 0x58c8dd, 0.62, 0.08);
-buildRiver(RIVERS['涑水河'], 0.18, 0x58c8dd, 0.55, 0.08);
+/* 水系按数据绘制；CFG.riverStyles 可给指定河流设定宽度/颜色，如 {'黄河': {w:0.62, c:0xd9a441}} */
+var RIVER_STYLES = CFG.riverStyles || {};
+Object.keys(RIVERS).forEach(function (name) {
+  var line = RIVERS[name];
+  if (!line || line.length < 2) return;
+  var st = RIVER_STYLES[name] || {};
+  var isMain = !!st.main || st.w > 0.4;
+  buildRiver(line, st.w || (isMain ? 0.62 : 0.26), st.c || (isMain ? 0xd9a441 : 0x4fb8e8),
+             st.o || (isMain ? 0.92 : 0.72), st.y || (isMain ? 0.10 : 0.085));
+});
 
 /* ================= 地市名称标注 ================= */
 (function cityLabels() {
@@ -607,7 +611,9 @@ var $ = function (id) { return document.getElementById(id); };
 var _catSet = {}; SPOTS.forEach(function (s) { _catSet[s.cat] = 1; });
 var EXTRA = CFG.extraFilters || [];
 var CATS = ['全部'].concat(Object.keys(_catSet)).concat(EXTRA.map(function (f) { return f.label; }));
-var CITY_ORDER = CFG.cityOrder || Object.keys(CITY_COLOR);
+var CITY_ORDER = (CFG.cityOrder && CFG.cityOrder.length) ? CFG.cityOrder
+  : (Object.keys(CITY_COLOR).length ? Object.keys(CITY_COLOR)
+    : SPOTS.map(function (s) { return s.city; }).filter(function (v, i, arr) { return arr.indexOf(v) === i; }));
 var state = { cats: ['全部'], q: '', route: null, sel: null, hover: null, tour: false, night: false };
 var closed = {};
 
