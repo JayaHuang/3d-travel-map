@@ -8,7 +8,7 @@
 
 ![演示](docs/demo.gif)
 
-**[▶ 观看完整演示视频 (MP4)](docs/demo.mp4)** · **[下载山西示例（双击即开）](examples/shanxi/山西3D旅行导览地图.html)**
+**[▶ 观看完整演示视频 (16 秒 · 含章节字幕)](docs/demo.mp4)** · **[下载山西示例（双击即开）](examples/shanxi/山西3D旅行导览地图.html)**
 
 `Agent Skill` `SKILL.md` `Three.js` `单文件 HTML` `离线可用` `数据驱动`
 
@@ -124,6 +124,31 @@ node  scripts/smoke_test.js "我的地图.html" ./shots                        #
 | 黑神话取景地 | 27 处（按山西省文物局官方名单标注） |
 | 经典线路 | 6 条（晋北古建 / 晋商民俗 / 晋南黄河 / 太行山水 / 黑神话巡礼 / 太原周边） |
 
+## 生成演示素材（GIF / MP4 / 截图）
+
+无头浏览器软渲染只有 ~3 FPS，直接录屏会卡顿。做法是**逐帧摆机位**：每帧显式设置相机位姿再截图，最后用 ffmpeg 编码，得到流畅的演示。
+
+```bash
+# GIF 预告（短循环）+ 4 张关键截图
+node scripts/make_media.js "我的地图.html" ./media
+
+# 完整演示视频（9 个分镜、约 16 秒，含章节字幕）
+node scripts/make_video.js "我的地图.html" ./media
+```
+
+编码（ffmpeg 建议用 `pip install imageio-ffmpeg` 自带的完整版；Playwright 自带的是裁剪版，无 libx264 / palettegen）：
+
+```bash
+# GIF：两遍调色板控制体积
+ffmpeg -framerate 10 -i media/frames/f%02d.png \
+  -vf "scale=760:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=4" \
+  -loop 0 demo.gif
+
+# MP4：章节字幕用 drawtext 烘焙（中文字体指到系统字体即可）
+ffmpeg -framerate 12 -i media/vframes/v%03d.png -vf "scale=1280:-2,drawtext=fontfile='C\:/Windows/Fonts/msyh.ttc':text='章节标题':fontsize=30:box=1:boxcolor=black@0.45:boxborderw=14" \
+  -c:v libx264 -crf 21 -pix_fmt yuv420p -movflags +faststart demo.mp4
+```
+
 ## 目录结构
 
 ```
@@ -139,7 +164,8 @@ node  scripts/smoke_test.js "我的地图.html" ./shots                        #
 │   ├── generate.py              # 一键生成（推荐入口）
 │   ├── fetch_admin_geo.py       # 行政区代码 → 简化边界
 │   ├── build_standalone.py      # 内联打包为单文件 HTML
-│   ├── make_media.js            # 生成演示截图与分镜序列帧
+│   ├── make_media.js            # 生成演示截图与 GIF 分镜
+│   ├── make_video.js            # 生成章节化演示视频分镜
 │   └── smoke_test.js            # 无头浏览器渲染自检
 ├── references/
 │   ├── implementation.md        # 实现要点与推荐参数（二次开发参考）
